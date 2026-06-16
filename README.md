@@ -20,7 +20,20 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173/kaban-board/](http://localhost:5173/kaban-board/) in your browser.
+
+## Live site (GitHub Pages)
+
+**https://samramseyer.github.io/kaban-board/**
+
+If the live site is blank, GitHub Pages is serving source files instead of the production build. Fix it once:
+
+1. Open [Repository Settings → Pages](https://github.com/samramseyer/kaban-board/settings/pages)
+2. Under **Build and deployment → Source**, choose **Deploy from a branch**
+3. Set **Branch** to `gh-pages` and folder to **`/ (root)`**
+4. Save, wait ~1 minute, then hard-refresh the live URL
+
+Pushes to `main` automatically rebuild and deploy to the `gh-pages` branch via GitHub Actions.
 
 ## Build
 
