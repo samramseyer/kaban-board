@@ -1,8 +1,16 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { resolve } from "path";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 // GitHub Pages project site: https://samramseyer.github.io/kaban-board/
 export default defineConfig({
-  base: '/kaban-board/',
+  base: "/kaban-board/",
   plugins: [react()],
-})
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "app.html"),
+      },
+    },
+  },
+});

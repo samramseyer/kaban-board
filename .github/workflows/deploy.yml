@@ -31,10 +31,25 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          force_orphan: true
+      - name: Verify production build
+        run: |
+          if grep -q '/src/main.tsx' dist/app.html; then
+            echo "Build failed: dist still references source files"
+            exit 1
+          fi
+          test -f dist/.nojekyll
+
+      - name: Publish build to repository root
+        run: |
+          cp dist/app.html index.html
+          cp dist/app.html 404.html
+          rsync -a --delete dist/assets/ assets/
+
+      - name: Commit and push production files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html 404.html assets/
+          git diff --staged --quiet && echo "No production changes to deploy" && exit 0
+          git commit -m "deploy: update GitHub Pages production build [skip ci]"
+          git push
