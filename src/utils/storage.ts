@@ -1,5 +1,6 @@
 import { COLUMNS, getSampleTasks, STORAGE_KEY } from '../constants'
 import type { BoardState, FilterState, Task } from '../types'
+import { migrateTaskOrders } from './taskOrder'
 
 export const defaultFilters: FilterState = {
   search: '',
@@ -8,32 +9,42 @@ export const defaultFilters: FilterState = {
   assignee: '',
 }
 
+export const NOTICE_DISMISSED_KEY = 'kaban-board-notice-dismissed'
+
+function normalizeBoard(parsed: BoardState): BoardState {
+  return {
+    tasks: migrateTaskOrders(parsed.tasks),
+    columns: parsed.columns ?? COLUMNS,
+    filters: parsed.filters ?? defaultFilters,
+  }
+}
+
 export function loadBoard(): BoardState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as BoardState
       if (parsed.tasks && Array.isArray(parsed.tasks)) {
-        return {
-          tasks: parsed.tasks,
-          columns: parsed.columns ?? COLUMNS,
-          filters: parsed.filters ?? defaultFilters,
-        }
+        return normalizeBoard(parsed)
       }
     }
   } catch {
     // fall through to default
   }
 
-  return {
+  return normalizeBoard({
     tasks: getSampleTasks(),
     columns: COLUMNS,
     filters: defaultFilters,
-  }
+  })
 }
 
 export function saveBoard(state: BoardState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // QuotaExceededError or private browsing — silently fail; data stays in memory
+  }
 }
 
 export function exportBoard(state: BoardState): string {
@@ -45,17 +56,21 @@ export function importBoard(json: string): BoardState {
   if (!parsed.tasks || !Array.isArray(parsed.tasks)) {
     throw new Error('Invalid board file: missing tasks array')
   }
-  return {
+  return normalizeBoard({
     tasks: parsed.tasks,
     columns: parsed.columns ?? COLUMNS,
     filters: parsed.filters ?? defaultFilters,
-  }
-}
-
-export function getColumnTaskCount(tasks: Task[], columnId: string): number {
-  return tasks.filter((t) => t.columnId === columnId).length
+  })
 }
 
 export function getTotalStoryPoints(tasks: Task[]): number {
   return tasks.reduce((sum, t) => sum + (t.storyPoints ?? 0), 0)
+}
+
+export function isNoticeDismissed(): boolean {
+  return localStorage.getItem(NOTICE_DISMISSED_KEY) === '1'
+}
+
+export function dismissNotice(): void {
+  localStorage.setItem(NOTICE_DISMISSED_KEY, '1')
 }

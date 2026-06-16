@@ -20,6 +20,7 @@ export interface Task {
   title: string
   description: string
   columnId: ColumnId
+  order: number
   priority: Priority
   labels: TaskLabel[]
   assignee: string
@@ -41,7 +42,7 @@ export interface BoardState {
   filters?: FilterState
 }
 
-export type TaskDraft = Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
+export type TaskDraft = Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>
 
 export interface FilterState {
   search: string

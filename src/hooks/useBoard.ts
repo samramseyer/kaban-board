@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { COLUMNS, createEmptyTask } from '../constants'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { COLUMNS, createEmptyTask, getSampleTasks } from '../constants'
 import type { ColumnId, FilterState, Task, TaskDraft } from '../types'
+import { createId } from '../utils/format'
 import { defaultFilters, loadBoard, saveBoard } from '../utils/storage'
+import {
+  countHiddenInColumn,
+  getNextOrder,
+  moveTaskInBoard,
+  reorderTasksInColumn,
+  sortTasksInColumn,
+} from '../utils/taskOrder'
+import { useDebouncedSave } from './useDebouncedSave'
 
 function matchesFilter(task: Task, filters: FilterState): boolean {
   if (filters.search) {
@@ -16,13 +24,22 @@ function matchesFilter(task: Task, filters: FilterState): boolean {
   return true
 }
 
-export function useBoard() {
-  const [tasks, setTasks] = useState<Task[]>(() => loadBoard().tasks)
-  const [filters, setFilters] = useState<FilterState>(() => loadBoard().filters ?? defaultFilters)
+const initialBoard = loadBoard()
 
-  useEffect(() => {
-    saveBoard({ tasks, columns: COLUMNS, filters })
-  }, [tasks, filters])
+export function useBoard() {
+  const [tasks, setTasks] = useState<Task[]>(initialBoard.tasks)
+  const [filters, setFilters] = useState<FilterState>(initialBoard.filters ?? defaultFilters)
+  const undoRef = useRef<{ task: Task; timer: number } | null>(null)
+
+  const boardState = useMemo(() => ({ tasks, columns: COLUMNS, filters }), [tasks, filters])
+
+  useDebouncedSave(boardState, saveBoard)
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(filters.search || filters.priority !== 'all' || filters.label !== 'all' || filters.assignee),
+    [filters],
+  )
 
   const filteredTasks = useMemo(
     () => tasks.filter((t) => matchesFilter(t, filters)),
@@ -32,104 +49,112 @@ export function useBoard() {
   const tasksByColumn = useMemo(() => {
     const map = new Map<ColumnId, Task[]>()
     for (const col of COLUMNS) {
-      map.set(col.id, filteredTasks.filter((t) => t.columnId === col.id))
+      map.set(col.id, sortTasksInColumn(filteredTasks, col.id))
     }
     return map
   }, [filteredTasks])
 
+  const hiddenByColumn = useMemo(() => {
+    const map = new Map<ColumnId, number>()
+    for (const col of COLUMNS) {
+      map.set(col.id, countHiddenInColumn(tasks, filteredTasks, col.id))
+    }
+    return map
+  }, [tasks, filteredTasks])
+
   const addTask = useCallback((draft: TaskDraft) => {
     const now = new Date().toISOString()
-    const task: Task = {
-      ...draft,
-      id: uuidv4(),
-      createdAt: now,
-      updatedAt: now,
-    }
-    setTasks((prev) => [...prev, task])
-    return task
+    setTasks((prev) => {
+      const task: Task = {
+        ...draft,
+        id: createId(),
+        order: getNextOrder(prev, draft.columnId),
+        createdAt: now,
+        updatedAt: now,
+      }
+      return [...prev, task]
+    })
   }, [])
 
   const updateTask = useCallback((id: string, updates: Partial<TaskDraft>) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t,
-      ),
-    )
-  }, [])
-
-  const deleteTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  const moveTask = useCallback((taskId: string, columnId: ColumnId, index?: number) => {
     setTasks((prev) => {
-      const task = prev.find((t) => t.id === taskId)
+      const task = prev.find((t) => t.id === id)
       if (!task) return prev
 
-      const without = prev.filter((t) => t.id !== taskId)
-      const updated: Task = {
-        ...task,
-        columnId,
-        updatedAt: new Date().toISOString(),
+      const now = new Date().toISOString()
+      const merged: Task = { ...task, ...updates, updatedAt: now }
+
+      if (updates.columnId && updates.columnId !== task.columnId) {
+        const without = prev.filter((t) => t.id !== id)
+        return moveTaskInBoard([...without, merged], id, updates.columnId)
       }
 
-      if (index === undefined) {
-        return [...without, updated]
-      }
-
-      const columnTasks = without.filter((t) => t.columnId === columnId)
-      const otherTasks = without.filter((t) => t.columnId !== columnId)
-      columnTasks.splice(index, 0, updated)
-      return [...otherTasks, ...columnTasks]
+      return prev.map((t) => (t.id === id ? merged : t))
     })
+  }, [])
+
+  const deleteTask = useCallback((id: string, onUndo?: (task: Task) => void) => {
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === id)
+      if (!task) return prev
+
+      if (undoRef.current) window.clearTimeout(undoRef.current.timer)
+      if (onUndo) {
+        const timer = window.setTimeout(() => {
+          undoRef.current = null
+        }, 5000)
+        undoRef.current = { task, timer }
+        onUndo(task)
+      }
+
+      return prev.filter((t) => t.id !== id)
+    })
+  }, [])
+
+  const restoreTask = useCallback((task: Task) => {
+    if (undoRef.current) window.clearTimeout(undoRef.current.timer)
+    undoRef.current = null
+    setTasks((prev) => {
+      if (prev.some((t) => t.id === task.id)) return prev
+      return [...prev, task]
+    })
+  }, [])
+
+  const moveTask = useCallback((taskId: string, columnId: ColumnId, insertBeforeId?: string) => {
+    setTasks((prev) => moveTaskInBoard(prev, taskId, columnId, insertBeforeId))
   }, [])
 
   const reorderInColumn = useCallback((columnId: ColumnId, activeId: string, overId: string) => {
-    setTasks((prev) => {
-      const columnTasks = prev.filter((t) => t.columnId === columnId)
-      const otherTasks = prev.filter((t) => t.columnId !== columnId)
-
-      const oldIndex = columnTasks.findIndex((t) => t.id === activeId)
-      const newIndex = columnTasks.findIndex((t) => t.id === overId)
-      if (oldIndex === -1 || newIndex === -1) return prev
-
-      const reordered = [...columnTasks]
-      const [removed] = reordered.splice(oldIndex, 1)
-      reordered.splice(newIndex, 0, removed)
-
-      return [...otherTasks, ...reordered]
-    })
+    setTasks((prev) => reorderTasksInColumn(prev, columnId, activeId, overId))
   }, [])
 
-  const resetBoard = useCallback(() => {
-    setTasks(loadBoard().tasks)
-    setFilters(defaultFilters)
-  }, [])
-
-  const clearBoard = useCallback(() => {
-    setTasks([])
-    setFilters(defaultFilters)
-  }, [])
-
-  const loadTasks = useCallback((newTasks: Task[]) => {
+  const loadBoardState = useCallback((newTasks: Task[], newFilters?: FilterState) => {
     setTasks(newTasks)
+    if (newFilters) setFilters(newFilters)
+  }, [])
+
+  const resetToSample = useCallback(() => {
+    setTasks(getSampleTasks())
+    setFilters(defaultFilters)
   }, [])
 
   return {
     tasks,
     filteredTasks,
     tasksByColumn,
+    hiddenByColumn,
+    hasActiveFilters,
     columns: COLUMNS,
     filters,
     setFilters,
     addTask,
     updateTask,
     deleteTask,
+    restoreTask,
     moveTask,
     reorderInColumn,
-    resetBoard,
-    clearBoard,
-    loadTasks,
+    loadBoardState,
+    resetToSample,
     createEmptyTask,
   }
 }

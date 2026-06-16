@@ -6,11 +6,12 @@ import { TaskCard } from './TaskCard'
 interface KanbanColumnProps {
   column: ColumnType
   tasks: Task[]
+  hiddenCount: number
   onTaskClick: (task: Task) => void
   onAddTask: (columnId: ColumnType['id']) => void
 }
 
-export function KanbanColumn({ column, tasks, onTaskClick, onAddTask }: KanbanColumnProps) {
+export function KanbanColumn({ column, tasks, hiddenCount, onTaskClick, onAddTask }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
     data: { type: 'column', columnId: column.id },
@@ -27,7 +28,14 @@ export function KanbanColumn({ column, tasks, onTaskClick, onAddTask }: KanbanCo
           <h2 className="column__title">{column.title}</h2>
           <span className="column__count">{tasks.length}</span>
         </div>
-        {totalPoints > 0 && <span className="column__points">{totalPoints} SP</span>}
+        <div className="column__header-meta">
+          {hiddenCount > 0 && (
+            <span className="column__hidden" title="Hidden by active filters">
+              +{hiddenCount} hidden
+            </span>
+          )}
+          {totalPoints > 0 && <span className="column__points">{totalPoints} SP</span>}
+        </div>
       </header>
 
       <div ref={setNodeRef} className="column__body">
@@ -38,7 +46,9 @@ export function KanbanColumn({ column, tasks, onTaskClick, onAddTask }: KanbanCo
         </SortableContext>
 
         {tasks.length === 0 && (
-          <p className="column__empty">Drop tasks here or add a new one</p>
+          <p className="column__empty">
+            {hiddenCount > 0 ? `${hiddenCount} task(s) hidden by filters` : 'Drop tasks here or add a new one'}
+          </p>
         )}
       </div>
 

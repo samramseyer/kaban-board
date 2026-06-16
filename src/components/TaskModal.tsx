@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { LABELS, PRIORITIES, TEAM_MEMBERS } from '../constants'
+import { useEffect, useRef, useState } from 'react'
+import { COLUMNS, LABELS, PRIORITIES, TEAM_MEMBERS } from '../constants'
 import type { ColumnId, Task, TaskDraft } from '../types'
+import { formatRelativeTime } from '../utils/format'
 
 interface TaskModalProps {
   task: Task | null
@@ -9,26 +10,49 @@ interface TaskModalProps {
   isNew: boolean
   onClose: () => void
   onSave: (draft: TaskDraft) => void
-  onDelete?: (id: string) => void
+  onDelete?: () => void
 }
 
 export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelete }: TaskModalProps) {
   const [form, setForm] = useState<TaskDraft>(draft)
+  const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen) setForm(draft)
   }, [isOpen, draft])
 
   useEffect(() => {
+    if (!isOpen) return
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    if (isOpen) {
-      document.addEventListener('keydown', onKey)
-      document.body.style.overflow = 'hidden'
+
+    const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+      'button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
+    )
+    const first = focusable?.[0]
+    const last = focusable?.[focusable.length - 1]
+
+    const trapFocus = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !focusable?.length) return
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last?.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first?.focus()
+      }
     }
+
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', trapFocus)
+    document.body.style.overflow = 'hidden'
+    first?.focus()
+
     return () => {
       document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', trapFocus)
       document.body.style.overflow = ''
     }
   }, [isOpen, onClose])
@@ -54,6 +78,7 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div
+        ref={modalRef}
         className="modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -61,7 +86,15 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
         aria-labelledby="task-modal-title"
       >
         <header className="modal__header">
-          <h2 id="task-modal-title">{isNew ? 'New Task' : 'Edit Task'}</h2>
+          <div>
+            <h2 id="task-modal-title">{isNew ? 'New Task' : 'Edit Task'}</h2>
+            {!isNew && task && (
+              <p className="modal__meta">
+                Updated {formatRelativeTime(task.updatedAt)} · Created{' '}
+                {new Date(task.createdAt).toLocaleDateString()}
+              </p>
+            )}
+          </div>
           <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
             ×
           </button>
@@ -75,7 +108,6 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="What needs to be done?"
-              autoFocus
               required
             />
           </label>
@@ -97,12 +129,11 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
                 value={form.columnId}
                 onChange={(e) => setForm((p) => ({ ...p, columnId: e.target.value as ColumnId }))}
               >
-                <option value="backlog">Backlog</option>
-                <option value="todo">To Do</option>
-                <option value="in-progress">In Progress</option>
-                <option value="review">Code Review</option>
-                <option value="testing">QA / Testing</option>
-                <option value="done">Done</option>
+                {COLUMNS.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.title}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -160,9 +191,7 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
               <input
                 type="date"
                 value={form.dueDate ?? ''}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, dueDate: e.target.value || null }))
-                }
+                onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value || null }))}
               />
             </label>
           </div>
@@ -189,17 +218,8 @@ export function TaskModal({ task, draft, isOpen, isNew, onClose, onSave, onDelet
           </fieldset>
 
           <footer className="modal__footer">
-            {!isNew && task && onDelete && (
-              <button
-                type="button"
-                className="btn btn--danger"
-                onClick={() => {
-                  if (confirm('Delete this task permanently?')) {
-                    onDelete(task.id)
-                    onClose()
-                  }
-                }}
-              >
+            {!isNew && onDelete && (
+              <button type="button" className="btn btn--danger" onClick={onDelete}>
                 Delete
               </button>
             )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { forwardRef, useState } from 'react'
 import { LABELS, PRIORITIES, TEAM_MEMBERS } from '../constants'
 import type { FilterState } from '../types'
 import { getTotalStoryPoints } from '../utils/storage'
@@ -7,12 +7,21 @@ interface HeaderProps {
   taskCount: number
   filteredCount: number
   totalPoints: number
+  hasActiveFilters: boolean
   onExport: () => void
   onImport: () => void
   onReset: () => void
 }
 
-export function Header({ taskCount, filteredCount, totalPoints, onExport, onImport, onReset }: HeaderProps) {
+export function Header({
+  taskCount,
+  filteredCount,
+  totalPoints,
+  hasActiveFilters,
+  onExport,
+  onImport,
+  onReset,
+}: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -47,6 +56,9 @@ export function Header({ taskCount, filteredCount, totalPoints, onExport, onImpo
           <span className="stat">
             <strong>{totalPoints}</strong> SP
           </span>
+          {hasActiveFilters && filteredCount < taskCount && (
+            <span className="stat stat--filter">({taskCount - filteredCount} hidden)</span>
+          )}
         </div>
 
         <div className="header__actions header__actions--desktop">
@@ -116,11 +128,15 @@ export function Header({ taskCount, filteredCount, totalPoints, onExport, onImpo
 
 interface FilterBarProps {
   filters: FilterState
+  hiddenCount: number
   onChange: (filters: FilterState) => void
   onClear: () => void
 }
 
-export function FilterBar({ filters, onChange, onClear }: FilterBarProps) {
+export const FilterBar = forwardRef<HTMLInputElement, FilterBarProps>(function FilterBar(
+  { filters, hiddenCount, onChange, onClear },
+  ref,
+) {
   const [expanded, setExpanded] = useState(false)
   const hasFilters =
     filters.search || filters.priority !== 'all' || filters.label !== 'all' || filters.assignee
@@ -134,8 +150,9 @@ export function FilterBar({ filters, onChange, onClear }: FilterBarProps) {
             <path d="m21 21-4.3-4.3" />
           </svg>
           <input
+            ref={ref}
             type="search"
-            placeholder="Search tasks..."
+            placeholder="Search tasks... (/ to focus)"
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
           />
@@ -157,6 +174,10 @@ export function FilterBar({ filters, onChange, onClear }: FilterBarProps) {
           </button>
         )}
       </div>
+
+      {hasFilters && hiddenCount > 0 && (
+        <p className="filters__hint">{hiddenCount} task(s) hidden by active filters</p>
+      )}
 
       <div className="filters__panel">
         <select
@@ -202,6 +223,6 @@ export function FilterBar({ filters, onChange, onClear }: FilterBarProps) {
       </div>
     </div>
   )
-}
+})
 
 export { getTotalStoryPoints }

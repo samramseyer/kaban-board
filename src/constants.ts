@@ -1,4 +1,4 @@
-import type { Column, ColumnId, Priority, Task, TaskLabel } from './types'
+import type { Column, ColumnId, Priority, Task, TaskDraft, TaskLabel } from './types'
 
 export const STORAGE_KEY = 'kaban-board-v1'
 
@@ -43,7 +43,7 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
 
 export const DEFAULT_COLUMN: ColumnId = 'backlog'
 
-export function createEmptyTask(columnId: ColumnId = DEFAULT_COLUMN): Omit<Task, 'id' | 'createdAt' | 'updatedAt'> {
+export function createEmptyTask(columnId: ColumnId = DEFAULT_COLUMN): TaskDraft {
   return {
     title: '',
     description: '',
@@ -58,7 +58,7 @@ export function createEmptyTask(columnId: ColumnId = DEFAULT_COLUMN): Omit<Task,
 
 export function getSampleTasks(): Task[] {
   const now = new Date().toISOString()
-  return [
+  const samples: Omit<Task, 'order'>[] = [
     {
       id: 'sample-1',
       title: 'Set up CI/CD pipeline',
@@ -138,4 +138,13 @@ export function getSampleTasks(): Task[] {
       updatedAt: now,
     },
   ]
+
+  const withOrder: Task[] = []
+  for (const column of COLUMNS) {
+    const columnSamples = samples.filter((s) => s.columnId === column.id)
+    columnSamples.forEach((sample, index) => {
+      withOrder.push({ ...sample, order: index })
+    })
+  }
+  return withOrder
 }

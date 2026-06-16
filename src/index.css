@@ -119,12 +119,35 @@ button {
 
 .local-notice {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
   padding: 0.45rem 1rem;
   font-size: 0.72rem;
   color: var(--text-muted);
-  text-align: center;
   border-bottom: 1px solid var(--border);
   background: rgba(34, 197, 94, 0.06);
+}
+
+.local-notice__dismiss {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.local-notice__dismiss:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.filters__hint {
+  font-size: 0.72rem;
+  color: var(--accent);
+  padding-top: 0.45rem;
 }
 
 .header__stats {
@@ -198,6 +221,10 @@ button {
 .stat strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.stat--filter {
+  color: var(--accent);
 }
 
 /* Filters */
@@ -338,6 +365,15 @@ button {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.btn--danger-solid {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn--danger-solid:hover {
+  background: #dc2626;
+}
+
 /* Board */
 .app__main {
   flex: 1;
@@ -448,9 +484,23 @@ button {
   border-top: 3px solid;
   border-radius: var(--radius) var(--radius) 0 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.column__header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.column__hidden {
+  font-size: 0.65rem;
+  color: var(--accent);
+  white-space: nowrap;
 }
 
 .column__title-row {
@@ -525,7 +575,41 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.task-card__inner {
+  display: flex;
+  align-items: stretch;
+}
+
+.task-card__handle {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-right: 1px solid var(--border);
+  cursor: grab;
   touch-action: none;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.task-card:hover .task-card__handle,
+.task-card__handle:focus-visible {
+  opacity: 1;
+  color: var(--text);
+}
+
+.task-card__handle:active {
+  cursor: grabbing;
+}
+
+.task-card__handle--static {
+  cursor: default;
+  border-right: 1px solid var(--border);
 }
 
 .task-card:hover {
@@ -548,14 +632,15 @@ button {
 
 .task-card__body {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0.75rem;
   text-align: left;
-  cursor: grab;
+  cursor: pointer;
 }
 
-.task-card__body:active {
-  cursor: grabbing;
+.task-card__body--static {
+  cursor: default;
 }
 
 .task-card__labels {
@@ -629,6 +714,11 @@ button {
   font-weight: 500;
 }
 
+.task-card__updated {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
 .task-card__assignee {
   width: 24px;
   height: 24px;
@@ -700,6 +790,12 @@ button {
 .modal__header h2 {
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.modal__meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
 }
 
 .modal__close {
@@ -812,6 +908,88 @@ button {
 
 .modal__footer .btn--danger {
   width: 100%;
+}
+
+/* Confirm dialog */
+.confirm-dialog {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.confirm-dialog h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.confirm-dialog p {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Toasts */
+.toast-stack {
+  position: fixed;
+  bottom: calc(5rem + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 200;
+  width: min(420px, calc(100vw - 2rem));
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+.toast__action {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.toast__action:hover {
+  color: var(--accent-hover);
+}
+
+.toast__close {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.toast__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 /* Scrollbar */
@@ -986,8 +1164,8 @@ button {
 }
 
 @media (hover: none) and (pointer: coarse) {
-  .task-card__body {
-    cursor: default;
+  .task-card__handle {
+    opacity: 1;
   }
 
   .fab {
